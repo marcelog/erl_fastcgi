@@ -63,7 +63,6 @@
 %%% Exports.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([start_link/3, run/4, close/1]).
--export([test/0]).
 -export([
   init/1,
   handle_call/3,
@@ -98,32 +97,6 @@ run(Server, RequestId, Params, Data) ->
   gen_server:cast(Server, {run, self(), RequestId, Params, Data}),
   ok.
 
-test() ->
-  {ok, Pid} = start_link("127.0.0.1", 9000, 1000),
-  run(Pid, 600, [
-    {"SCRIPT_FILENAME", "/tmp/test.php"},
-    {"QUERY_STRING", ""},
-    {"REQUEST_METHOD", "GET"},
-    {"CONTENT_TYPE", "text/html"},
-    {"CONTENT_LENGTH", "0"},
-    {"SCRIPT_NAME", "test.php"},
-    {"GATEWAY_INTERFACE", "CGI/1.1"},
-    {"REMOTE_ADDR", "1.1.1.1"},
-    {"REMOTE_PORT", "1111"},
-    {"SERVER_ADDR", "127.0.0.1"},
-    {"SERVER_PORT", "3838"},
-    {"SERVER_NAME", "host.com"}
-  ], <<>>),
-  test_wait(Pid).
-
-test_wait(Pid) ->
-  receive
-    X ->
-      io:format("Got: ~p~n", [X]),
-      test_wait(Pid)
-  after
-    5000 -> close(Pid)
-  end.
 %% @doc Closes the connection to the FastCGI application server and terminates
 %% this client.
 -spec close(pid()|atom()) -> term().
@@ -143,7 +116,6 @@ init([Host, Port, ReconnectIntervalMillis]) ->
     port => Port,
     requests => #{},
     buffer => <<>>,
-    data_to_read => 0,
     reconnect_interval => ReconnectIntervalMillis
   }}.
 
@@ -215,7 +187,6 @@ handle_info({connect}, State) ->
     {noreply, State#{
       sock := Sock,
       buffer := <<>>,
-      data_to_read := 0,
       requests := #{}
     }};
     _ ->
@@ -238,8 +209,7 @@ handle_info({tcp, Sock, Packet}, #{sock := Sock} = State) ->
   >> = FullPacket,
   DataToRead = PadLen + DataLen,
   case size(FullPacket) of
-    X when X < DataToRead ->
-      {noreply, State#{buffer := FullPacket, data_to_read := DataToRead}};
+    X when X < DataToRead -> {noreply, State#{buffer := FullPacket}};
     _ ->
       <<Data:DataLen/binary, _Pad:PadLen/binary, Rest/binary>> = DataAndPad,
       Caller = maps:get(ReqId, Requests),
@@ -249,11 +219,9 @@ handle_info({tcp, Sock, Packet}, #{sock := Sock} = State) ->
         ?FCGI_END_REQUEST -> Caller ! {fast_cgi_done, ReqId}
       end,
       case size(Rest) of
-        0 -> {noreply, State#{buffer := <<>>, data_to_read := 0}};
+        0 -> {noreply, State#{buffer := <<>>}};
         _ ->
-          handle_info(
-            {tcp, Sock, Rest}, State#{buffer := <<>>, data_to_read := 0}
-          )
+          handle_info({tcp, Sock, Rest}, State#{buffer := <<>>})
       end
   end;
 
