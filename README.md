@@ -58,6 +58,10 @@ Your process should get messages like these:
 {fastcgi_request_done,600,fast_cgi_connection_reset}
 ```
 
+# Pooling
+There is no pooling support out of the box, but you can use your favorite worker
+pool library to run as many of these as needed.
+
 ## License
 The source code is released under Apache 2 License.
 
