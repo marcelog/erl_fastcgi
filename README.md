@@ -10,6 +10,15 @@ client written in Erlang.
 make
 ```
 
+# Installing
+In your <a href="http://www.rebar3.org/">Rebar</a> project:
+
+```
+{deps, [
+  {erl_fastcgi, {git, "git://github.com/marcelog/erl_fastcgi", {ref, "master"}}}
+]}.
+```
+
 # Use example
 ```erlang
 test() ->
