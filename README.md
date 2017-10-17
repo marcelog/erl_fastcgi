@@ -71,6 +71,9 @@ Your process should get messages like these:
 There is no pooling support out of the box, but you can use your favorite worker
 pool library to run as many of these as needed.
 
+## Related reads
+* [Call FastCGI applications from Erlang](http://marcelog.github.io/articles/erlang_fastcgi_client.html)
+
 ## License
 The source code is released under Apache 2 License.
 
