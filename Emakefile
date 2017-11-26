@@ -1,5 +1,4 @@
 {"src/*", [
-  {parse_transform, lager_transform},
   warn_unused_vars,
   warn_export_all,
   warn_shadow_vars,
@@ -20,7 +19,6 @@
   {i, ""}
 ]}.
 {"src/*/*", [
-  {parse_transform, lager_transform},
   warn_unused_vars,
   warn_export_all,
   warn_shadow_vars,
