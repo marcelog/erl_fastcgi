@@ -46,15 +46,16 @@ test() ->
     {"SERVER_NAME", "host.com"}
   ], <<>>),
 
-  test_wait(Pid).
+  test_wait(FastCGIConnection).
 
-test_wait(Pid) ->
+test_wait(FastCGIConnection) ->
   receive
+    {fast_cgi_done, _} -> ok;
     X ->
       io:format("Got: ~p~n", [X]),
-      test_wait(Pid)
+      test_wait(FastCGIConnection)
   after
-    5000 -> close(Pid)
+    5000 -> erl_fastcgi:close(FastCGIConnection)
   end.
 ```
 
