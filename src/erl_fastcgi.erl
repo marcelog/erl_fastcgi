@@ -140,19 +140,20 @@ handle_cast({run, Caller, RequestId, Params, Data}, State) ->
 
   EncodedParams = encode_params(Params),
 
-  ok = send_packet(Sock, ?FCGI_BEGIN_REQUEST, RequestId, payload_responder()),
-  ok = send_packet(Sock, ?FCGI_PARAMS, RequestId, EncodedParams),
-  case EncodedParams of
-    <<>> -> ok;
-    _ ->  ok = send_packet(Sock, ?FCGI_PARAMS, RequestId, <<>>)
-  end,
-  ok = send_packet(Sock, ?FCGI_STDIN, RequestId, Data),
-
-  case Data of
-    <<>> -> ok;
-    _ -> ok = send_packet(Sock, ?FCGI_STDIN, RequestId, <<>>)
-  end,
-
+  Packet = [
+    create(?FCGI_BEGIN_REQUEST, RequestId, payload_responder()),
+    create(?FCGI_PARAMS, RequestId, EncodedParams),
+    case Params of
+      [] -> [];
+      _ -> create(?FCGI_PARAMS, RequestId, <<>>)
+    end,
+    create(?FCGI_STDIN, RequestId, Data),
+    case Data of
+      <<>> -> [];
+      _ -> create(?FCGI_STDIN, RequestId, <<>>)
+    end
+  ],
+  ok = gen_tcp:send(Sock, Packet),
   NewRequests = maps:put(RequestId, Caller, Requests),
   {noreply, State#{requests := NewRequests}};
 
@@ -297,17 +298,17 @@ payload_responder() ->
     0, 0, 0, 0, 0
   >>.
 
-%% @doc Sends a FastCGI packet through the given socket with the given
-%% request id and data.
--spec send_packet(
-  gen_tcp:socket(), non_neg_integer(), pos_integer(), binary()
-) -> ok.
-send_packet(Sock, Type, Id, Data) ->
+%% @doc Accumulates bits into a packet before sending it to the app server.
+-spec create(non_neg_integer(), pos_integer(), binary()) -> binary().
+create(Type, Id, Data) ->
   DataLen = size(Data),
-  PadLen = 8 - (DataLen rem 8),
+  PadLen = case DataLen rem 8 of
+    0 -> 0;
+    Bytes -> 8 - Bytes
+  end,
   PadData = pad(PadLen),
 
-  Packet = <<
+  <<
     ?FCGI_VERSION_1,
     Type:8/integer,
     Id:16/integer,
@@ -316,9 +317,7 @@ send_packet(Sock, Type, Id, Data) ->
     0,
     Data/binary,
     PadData/binary
-  >>,
-  ok = gen_tcp:send(Sock, Packet),
-  ok.
+  >>.
 
 %% @doc Returns a binary filled with 0s with the given length.
 -spec pad(non_neg_integer()) -> binary().
